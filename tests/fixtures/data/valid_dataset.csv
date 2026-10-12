@@ -1,0 +1,5 @@
+feature_num,feature_cat,target
+1.0,A,yes
+2.0,B,no
+3.0,A,yes
+ 

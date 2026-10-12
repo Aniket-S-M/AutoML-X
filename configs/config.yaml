@@ -1,0 +1,32 @@
+project:
+  name: automl-pipeline
+  environment: local
+  random_seed: 42
+
+data:
+  input_path: data/raw/dataset.csv
+  raw_path: data/raw
+  processed_path: data/processed
+  target_column: target
+  test_size: 0.2
+  validation_size: 0.2
+
+training:
+  random_seed:
+  metric: accuracy
+
+optimization:
+  enabled: false
+  n_trials: 25
+  timeout_seconds:
+  direction: maximize
+
+model:
+  artifact_path: models/artifacts
+  default_model_name: baseline_model
+
+monitoring:
+  threshold: 0.1
+
+registry:
+  path: models/registry
