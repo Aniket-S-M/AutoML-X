@@ -1,0 +1,16 @@
+FROM apache/airflow:3.3.2-python3.12
+
+USER root
+WORKDIR /opt/automl-x
+
+COPY --chown=airflow:root pyproject.toml README.md ./
+COPY --chown=airflow:root src ./src
+
+RUN chown airflow:root /opt/automl-x
+
+USER airflow
+
+RUN pip install --no-cache-dir \
+    --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt \
+    "apache-airflow==3.3.2" \
+    .

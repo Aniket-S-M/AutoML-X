@@ -28,6 +28,7 @@ class DataConfig(BaseModel):
     raw_path: Path = Path("data/raw")
     processed_path: Path = Path("data/processed")
     target_column: str = "target"
+    excluded_feature_columns: list[str] = Field(default_factory=list)
     test_size: float = Field(default=0.2, gt=0.0, lt=1.0)
     validation_size: float = Field(default=0.2, gt=0.0, lt=1.0)
 
@@ -61,6 +62,13 @@ class MonitoringConfig(BaseModel):
     threshold: float = Field(default=0.1, ge=0.0)
 
 
+class EvaluationGateConfig(BaseModel):
+    """Explicit validation metric and minimum score for model promotion."""
+
+    metric_name: str | None = None
+    minimum_validation_score: float | None = None
+
+
 class RegistryConfig(BaseModel):
     """Versioned model registry location."""
 
@@ -76,6 +84,7 @@ class Settings(BaseModel):
     optimization: OptimizationConfig = Field(default_factory=OptimizationConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
+    evaluation_gate: EvaluationGateConfig = Field(default_factory=EvaluationGateConfig)
     registry: RegistryConfig = Field(default_factory=RegistryConfig)
 
     @property

@@ -130,6 +130,11 @@ configs/config.yaml
 
 Review the configuration before running scripts or integrating components into a larger workflow.
 
+## Airflow orchestration
+
+The local Airflow workflow, Docker Compose setup, shared-volume layout, and
+promotion-gate instructions are documented in [`airflow/README.md`](airflow/README.md).
+
 ## Example Workflow
 
 The intended workflow is:
