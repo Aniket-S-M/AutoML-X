@@ -1,8 +1,10 @@
 import joblib
 import numpy as np
 import pandas as pd
+import pytest
 
 from automl.config.settings import Settings
+from automl.exceptions import DataValidationError
 from automl.preprocessing import (
     build_preprocessor,
     preprocess_dataset,
@@ -151,6 +153,58 @@ def test_classification_split_uses_stratification_where_supported():
     assert set(split.y_train.unique()) == {"no", "yes"}
     assert set(split.y_validation.unique()) == {"no", "yes"}
     assert set(split.y_test.unique()) == {"no", "yes"}
+
+
+def test_customer_id_is_excluded_without_mutating_source_and_fit_uses_train_only():
+    data_frame = _classification_frame()
+    data_frame.insert(0, "customerID", [f"id-{index}" for index in range(len(data_frame))])
+    original = data_frame.copy(deep=True)
+    settings = Settings(
+        project={"random_seed": 7},
+        data={
+            "target_column": "target",
+            "excluded_feature_columns": ["customerID"],
+            "test_size": 0.2,
+            "validation_size": 0.2,
+        },
+    )
+
+    result = preprocess_dataset(data_frame, settings)
+    train_split = split_dataset(data_frame, settings)
+
+    pd.testing.assert_frame_equal(data_frame, original)
+    assert "customerID" not in result.preprocessor.feature_names_in_
+    assert "target" not in result.preprocessor.feature_names_in_
+    assert "customerID" not in result.feature_metadata.categorical_columns
+    assert result.preprocessor.named_transformers_["numerical"].named_steps[
+        "imputer"
+    ].statistics_[0] == train_split.X_train["age"].median()
+    assert result.X_train.shape[1] == result.X_validation.shape[1]
+    assert result.X_train.shape[1] == result.X_test.shape[1]
+    assert result.X_test.shape[0] == len(result.y_test)
+
+
+def test_classification_split_requires_stratification_to_be_feasible():
+    data_frame = pd.DataFrame(
+        {"feature": [1, 2, 3], "target": ["No", "No", "Yes"]}
+    )
+
+    with pytest.raises(DataValidationError, match="at least two rows per class"):
+        split_dataset(data_frame, _settings())
+
+
+def test_stratified_train_validation_test_splits_preserve_class_ratio():
+    data_frame = pd.DataFrame(
+        {
+            "feature": np.arange(100),
+            "target": ["No"] * 90 + ["Yes"] * 10,
+        }
+    )
+
+    split = split_dataset(data_frame, _settings())
+
+    for target_split in (split.y_train, split.y_validation, split.y_test):
+        assert target_split.value_counts(normalize=True)["Yes"] == 0.1
 
 
 def test_preprocessing_is_fitted_on_training_data_only():

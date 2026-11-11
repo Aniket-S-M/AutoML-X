@@ -140,6 +140,7 @@ def test_metric_dictionary_contains_expected_values():
         "precision": 0.88,
         "recall": 0.87,
         "f1": 0.875,
+        "f1_weighted": 0.875,
     }
 
 
@@ -150,6 +151,7 @@ def test_metric_dictionary_contains_expected_values():
         ("precision", 0.88),
         ("recall", 0.87),
         ("f1", 0.875),
+        ("f1_weighted", 0.875),
         (" F1 ", 0.875),
     ],
 )
@@ -221,6 +223,27 @@ def test_best_model_selection_can_use_f1():
         validation_results,
         "f1",
     ) == "model_b"
+
+
+def test_best_model_selection_can_use_f1_yes():
+    validation_results = {
+        "logistic_regression": ClassificationMetrics(
+            accuracy=0.98,
+            precision=0.95,
+            recall=0.94,
+            f1=0.945,
+            f1_yes=0.4,
+        ),
+        "random_forest": ClassificationMetrics(
+            accuracy=0.91,
+            precision=0.9,
+            recall=0.89,
+            f1=0.895,
+            f1_yes=0.7,
+        ),
+    }
+
+    assert select_best_model(validation_results, "f1_yes") == "random_forest"
 
 
 def test_empty_validation_results_are_rejected():

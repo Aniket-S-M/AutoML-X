@@ -3,6 +3,9 @@ venv/
 __pycache__/
 .pytest_cache/
 .env
+.env.*
+*.env
+!.env.example
 *.pyc
 *.egg-info/
 
@@ -12,3 +15,15 @@ data/raw/
 data/processed/
 models/artifacts/
 models/registry/
+
+# Local Airflow logs and generated model artifacts.
+/airflow/logs/*
+!/airflow/logs/.gitkeep
+/airflow/metadata/*
+!/airflow/metadata/.gitkeep
+/airflow/metadata-backup-*/
+/airflow/metadata-migration-stage-*/
+/artifacts/*
+!/artifacts/.gitkeep
+/data/*
+!/data/.gitkeep

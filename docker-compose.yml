@@ -1,0 +1,30 @@
+services:
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    command: standalone
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/metadata/airflow.db
+      AUTOML_CONFIG_PATH: /opt/airflow/automl-x/configs/config.yaml
+      AUTOML_INPUT_CSV: /opt/airflow/shared/data/input.csv
+      AUTOML_ARTIFACT_ROOT: /opt/airflow/shared/artifacts
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/metadata:/opt/airflow/metadata
+      - ./airflow/plugins:/opt/airflow/plugins:ro
+      - ./configs:/opt/airflow/automl-x/configs:ro
+      - ./data:/opt/airflow/shared/data:ro
+      - ./artifacts:/opt/airflow/shared/artifacts
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

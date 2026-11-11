@@ -4,16 +4,18 @@ project:
   random_seed: 42
 
 data:
-  input_path: data/raw/dataset.csv
+  input_path: data/input.csv
   raw_path: data/raw
   processed_path: data/processed
-  target_column: target
+  target_column: Churn
+  excluded_feature_columns:
+    - customerID
   test_size: 0.2
   validation_size: 0.2
 
 training:
   random_seed:
-  metric: accuracy
+  metric: f1_yes
 
 optimization:
   enabled: false
@@ -27,6 +29,11 @@ model:
 
 monitoring:
   threshold: 0.1
+
+evaluation_gate:
+  # Provisional threshold approved for the controlled Airflow test.
+  metric_name: f1_yes
+  minimum_validation_score: 0.55
 
 registry:
   path: models/registry

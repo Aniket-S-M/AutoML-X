@@ -59,13 +59,19 @@ class PreprocessingResult:
 def split_features_target(
     data_frame: pd.DataFrame,
     target_column: str,
+    excluded_feature_columns: list[str] | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Separate features from target without mutating the original DataFrame."""
 
     if target_column not in data_frame.columns:
         raise DataValidationError(f"Configured target column is missing: {target_column}")
 
-    X = data_frame.drop(columns=[target_column]).copy()
+    excluded = [
+        column
+        for column in (excluded_feature_columns or [])
+        if column in data_frame.columns and column != target_column
+    ]
+    X = data_frame.drop(columns=[target_column, *excluded]).copy()
     y = data_frame[target_column].copy()
     return X, y
 
@@ -73,7 +79,11 @@ def split_features_target(
 def split_dataset(data_frame: pd.DataFrame, settings: Settings) -> DatasetSplit:
     """Split validated data into train, validation, and test sets."""
 
-    X, y = split_features_target(data_frame, settings.target_column)
+    X, y = split_features_target(
+        data_frame,
+        settings.target_column,
+        excluded_feature_columns=settings.data.excluded_feature_columns,
+    )
     test_size = settings.test_size
     validation_size = settings.validation_size
 
@@ -206,17 +216,23 @@ def _stratify_if_supported(
     class_counts = y.value_counts(dropna=False)
 
     if class_counts.empty or class_counts.min() < 2:
-        return None
+        raise DataValidationError(
+            "Stratified classification split requires at least two rows per class"
+        )
 
     test_count = int(np.ceil(len(y) * test_size))
     train_count = len(y) - test_count
     number_of_classes = len(class_counts)
 
     if test_count < number_of_classes:
-        return None
+        raise DataValidationError(
+            "Configured split size is too small to stratify every class"
+        )
 
     if train_count < number_of_classes:
-        return None
+        raise DataValidationError(
+            "Configured split size is too small to retain every class in training"
+        )
 
     return y
 

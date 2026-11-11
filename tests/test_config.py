@@ -15,16 +15,23 @@ def test_defaults_are_available():
     assert settings.test_size == 0.2
     assert settings.validation_size == 0.2
     assert settings.model_registry_path == Path("models/registry")
+    assert settings.evaluation_gate.metric_name is None
+    assert settings.evaluation_gate.minimum_validation_score is None
 
 
 def test_config_yaml_loads():
     settings = load_settings("configs/config.yaml")
 
     assert settings.project.name == "automl-pipeline"
-    assert settings.data.input_path == Path("data/raw/dataset.csv")
+    assert settings.data.input_path == Path("data/input.csv")
     assert settings.data.raw_path == Path("data/raw")
+    assert settings.target_column == "Churn"
+    assert settings.data.excluded_feature_columns == ["customerID"]
+    assert settings.training.metric == "f1_yes"
     assert settings.optimization.n_trials == 25
     assert settings.monitoring.threshold == 0.1
+    assert settings.evaluation_gate.metric_name == "f1_yes"
+    assert settings.evaluation_gate.minimum_validation_score == 0.55
 
 
 def test_missing_config_path_uses_defaults(tmp_path):

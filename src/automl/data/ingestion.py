@@ -22,7 +22,10 @@ def load_csv_data(settings: Settings, data_path: str | Path | None = None) -> pd
     _validate_csv_path(path)
 
     try:
-        data_frame = pd.read_csv(path)
+        # CSV exports sometimes encode empty numeric cells as a single space;
+        # treat that representation as missing so pandas can infer numeric
+        # columns such as TotalCharges correctly for downstream imputation.
+        data_frame = pd.read_csv(path, na_values=[" "])
     except EmptyDataError as exc:
         raise DataValidationError(f"CSV file is empty or has no columns: {path}") from exc
     except ParserError as exc:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -42,6 +43,18 @@ class TrainingResult:
     best_model: ClassifierMixin
     test_metrics: ClassificationMetrics
     failed_models: dict[str, str]
+
+
+@dataclass(frozen=True)
+class TrainingSelectionResult:
+    """Trained candidates and validation-based selection, without test metrics."""
+
+    trained_models: dict[str, ClassifierMixin]
+    validation_results: dict[str, ClassificationMetrics]
+    best_model_name: str
+    best_model: ClassifierMixin
+    failed_models: dict[str, str]
+    trained_at_utc: str | None = None
 
 
 def build_classification_models(
@@ -117,6 +130,51 @@ def train_models(
     """
     _validate_training_data(preprocessed_data)
 
+    selection = _fit_and_select_models(preprocessed_data, settings)
+
+    logger.info(
+        "Selected model '%s'. Running final test evaluation.",
+        selection.best_model_name,
+    )
+
+    try:
+        test_metrics = evaluate_classifier(
+            selection.best_model,
+            preprocessed_data.X_test,
+            preprocessed_data.y_test.to_numpy(),
+        )
+    except Exception as exc:
+        raise TrainingError(
+            f"Final test evaluation failed for model "
+            f"'{selection.best_model_name}': {exc}"
+        ) from exc
+
+    return TrainingResult(
+        trained_models=selection.trained_models,
+        validation_results=selection.validation_results,
+        best_model_name=selection.best_model_name,
+        best_model=selection.best_model,
+        test_metrics=test_metrics,
+        failed_models=selection.failed_models,
+    )
+
+
+def train_and_select_models(
+    preprocessed_data: PreprocessingResult,
+    settings: Settings,
+) -> TrainingSelectionResult:
+    """Fit candidates and select by validation metrics without using the test set."""
+
+    _validate_selection_data(preprocessed_data)
+    return _fit_and_select_models(preprocessed_data, settings)
+
+
+def _fit_and_select_models(
+    preprocessed_data: PreprocessingResult,
+    settings: Settings,
+) -> TrainingSelectionResult:
+    """Shared training and validation-based selection implementation."""
+
     candidate_models = build_classification_models(
         random_seed=settings.random_seed,
     )
@@ -144,9 +202,10 @@ def train_models(
             validation_results[model_name] = validation_metrics
 
             logger.info(
-                "Model '%s' validation accuracy=%.4f",
+                "Model '%s' validation %s=%.4f",
                 model_name,
-                validation_metrics.accuracy,
+                settings.training.metric,
+                validation_metrics.get(settings.training.metric),
             )
 
         except TrainingError as exc:
@@ -180,40 +239,56 @@ def train_models(
         validation_results=validation_results,
         metric=settings.training.metric,
     )
-
     best_model = trained_models[best_model_name]
 
     logger.info(
-        "Selected model '%s'. Running final test evaluation.",
+        "Selected model '%s' using validation metric '%s' with score %.4f",
         best_model_name,
+        settings.training.metric,
+        validation_results[best_model_name].get(settings.training.metric),
     )
 
-    try:
-        test_metrics = evaluate_classifier(
-            best_model,
-            preprocessed_data.X_test,
-            preprocessed_data.y_test.to_numpy(),
-        )
-    except Exception as exc:
-        raise TrainingError(
-            f"Final test evaluation failed for model "
-            f"'{best_model_name}': {exc}"
-        ) from exc
-
-    return TrainingResult(
+    return TrainingSelectionResult(
         trained_models=trained_models,
         validation_results=validation_results,
         best_model_name=best_model_name,
         best_model=best_model,
-        test_metrics=test_metrics,
         failed_models=failed_models,
+        trained_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     )
+
+
+def _validate_selection_data(
+    preprocessed_data: PreprocessingResult,
+) -> None:
+    """Validate only the training and validation splits needed for selection."""
+
+    if preprocessed_data.X_train.shape[0] == 0:
+        raise DataValidationError("Training dataset is empty")
+
+    if preprocessed_data.X_validation.shape[0] == 0:
+        raise DataValidationError("Validation dataset is empty")
+
+    if len(preprocessed_data.y_train) != preprocessed_data.X_train.shape[0]:
+        raise DataValidationError(
+            "Training features and targets have different lengths"
+        )
+
+    if len(preprocessed_data.y_validation) != preprocessed_data.X_validation.shape[0]:
+        raise DataValidationError(
+            "Validation features and targets have different lengths"
+        )
+
+    if preprocessed_data.X_train.shape[1] == 0:
+        raise DataValidationError(
+            "Training dataset contains zero transformed features"
+        )
 
 
 def _validate_training_data(
     preprocessed_data: PreprocessingResult,
 ) -> None:
-    """Validate that all required model-training splits are usable."""
+    """Validate all three splits required by the compatibility training API."""
     if preprocessed_data.X_train.shape[0] == 0:
         raise DataValidationError("Training dataset is empty")
 
@@ -228,10 +303,7 @@ def _validate_training_data(
             "Training features and targets have different lengths"
         )
 
-    if (
-        len(preprocessed_data.y_validation)
-        != preprocessed_data.X_validation.shape[0]
-    ):
+    if len(preprocessed_data.y_validation) != preprocessed_data.X_validation.shape[0]:
         raise DataValidationError(
             "Validation features and targets have different lengths"
         )
